@@ -1,0 +1,367 @@
+#Cleaning Dirty Data & Transformations
+
+
+#Download and install packages to be used. 
+
+install.packages('dplyr')
+install.packages('lubridate')
+install.packages('janitor')
+install.packages('stringr')
+
+
+#Attaching Libraries 
+library(dplyr)
+library(lubridate)
+library(janitor)
+library(stringr)
+
+
+######Getting 4 Professional Sport Leagues Data###########
+
+#Save the data set to your computer R Console, directly from Github.
+four_sports_injury <- read.csv("https://raw.githubusercontent.com/gsb15/Four-Professional-North-American-Sport-Leagues-Injury-Data-/main/41598_2021_87920_MOESM1_ESM.csv")
+
+View(four_sports_injury) #Viewing total data frame
+
+head(four_sports_injury) #Looking at the first 10 rows of the data frame
+
+tail(four_sports_injury) #Looking at the last 10 rows of the data frame
+
+str(four_sports_injury) #Looking at data structure
+
+#########################
+#Currently no variable to delineate different professional sports leagues. Need to create a variable.
+#This cannot be done by hand, way too many rows. 
+#Need to identify league by team names. 
+
+
+# Define team lists for each league
+mlb_teams <- c("Yankees", "Braves", "Devil Rays", "Mariners", "Orioles", "Rockies", "Royals", "White Sox",
+               "Cardinals", "Angels", "Padres", "Indians", "Mets", "Pirates", "Blue Jays", "Athletics",
+               "Cubs", "Diamondbacks", "Marlins", "Dodgers", "Giants", "Rangers", "Red Sox", "Brewers",
+               "Nationals", "Twins", "Astros", "Phillies", "Reds", "Tigers")
+
+nba_teams <- c("Lakers", "Celtics", "Warriors", "Bulls", "Heat", "Spurs", "Nets", "Knicks", "Raptors",
+               "76ers", "Clippers", "Mavericks", "Suns", "Jazz", "Nuggets", "Hawks", "Magic", "Pacers",
+               "Pistons", "Thunder", "Timberwolves", "Trail Blazers", "Kings", "Hornets", "Grizzlies",
+               "Wizards", "Pelicans", "Cavaliers", "Bucks")
+
+nfl_teams <- c("Patriots", "Cowboys", "Packers", "Steelers", "Giants", "Eagles", "49ers", "Broncos",
+               "Bears", "Raiders", "Dolphins", "Saints", "Colts", "Rams", "Seahawks", "Vikings",
+               "Chiefs", "Falcons", "Panthers", "Texans", "Titans", "Cardinals", "Chargers",
+               "Buccaneers", "Bengals", "Jets", "Jaguars", "Commanders", "Browns", "Ravens", "Lions")
+
+nhl_teams <- c("Coyotes", "Oilers", "Predators", "Red Wings", "Bruins", "Rangers", "Sabres", "Sharks",
+               "Stars", "Blackhawks", "Jets", "Islanders", "Senators", "Avalanche", "Lightning",
+               "Panthers", "Penguins", "Blue Jackets", "Canadiens", "Canucks", "Wild", "Flames",
+               "Flyers", "Golden Knights", "Hurricanes", "Devils", "Kraken")
+
+# Create a function to assign league
+assign_league <- function(team) { #function is creating a function. 
+  if (team %in% mlb_teams) {
+    return("MLB")
+  } else if (team %in% nba_teams) { #Notice the %in% function here: Checking TRUE or FALSE for if the team variable has either MLB, NBA, NFL or NHL teams 
+    return("NBA")
+  } else if (team %in% nfl_teams) {
+    return("NFL")
+  } else if (team %in% nhl_teams) {
+    return("NHL")
+  } else {
+    return("Unknown")
+  }
+}
+
+# Apply the function to create a new column
+four_sports_injury <- four_sports_injury %>%
+  mutate(League = sapply(Team, assign_league)) #notice we take the function then use the sapply funciton: This allows us to apply the funciton on each row of data.
+
+# View the result
+head(four_sports_injury)
+
+#Checking 
+
+four_sports_injury %>% 
+  count(League)
+
+#League     n
+#MLB      17654
+#NBA      12698
+#NFL      9199
+#NHL      12393
+#Unknown  4489
+
+#Notive the Unknowns, we need to see why these happended.. 
+
+
+four_sports_injury %>% 
+  filter(League == "Unknown") %>% 
+  select(Date, Team, Acquired, Relinquished, League) %>% 
+  View() 
+#This looks mostly of the teams: Ryas, Blues, Thrashers, Rockets, etc. -- This is a mix of different leagues. 
+
+
+#Let's get a better idea of the exact teams that are not being identified. 
+
+four_sports_injury %>% 
+  filter(League == "Unknown") %>% 
+  count(Team)
+
+#Teams      n
+#           2
+#Bills      372
+#Blazers    339
+#Blues      472
+#Bobcats    265
+#Capitals   575
+#Ducks      510
+#Maple Leafs461
+#Rays       494
+#Redskins   290
+#Rockets    536
+#Sonics     43
+#Thrashers  130
+
+#We are missing these teams within the different team vectors, will add and redo the function and sapply
+
+mlb_teams <- c("Yankees", "Braves", "Devil Rays", "Mariners", "Orioles", "Rockies", "Royals", "White Sox",
+               "Cardinals", "Angels", "Padres", "Indians", "Mets", "Pirates", "Blue Jays", "Athletics",
+               "Cubs", "Diamondbacks", "Marlins", "Dodgers", "Giants", "Rangers", "Red Sox", "Brewers",
+               "Nationals", "Twins", "Astros", "Phillies", "Reds", "Tigers", "Rays")
+
+nba_teams <- c("Lakers", "Celtics", "Warriors", "Bulls", "Heat", "Spurs", "Nets", "Knicks", "Raptors",
+               "76ers", "Clippers", "Mavericks", "Suns", "Jazz", "Nuggets", "Hawks", "Magic", "Pacers",
+               "Pistons", "Thunder", "Timberwolves", "Trail Blazers", "Kings", "Hornets", "Grizzlies",
+               "Wizards", "Pelicans", "Cavaliers", "Bucks", "Blazers", "Bobcats", "Rockets", "Sonics")
+
+nfl_teams <- c("Patriots", "Cowboys", "Packers", "Steelers", "Giants", "Eagles", "49ers", "Broncos",
+               "Bears", "Raiders", "Dolphins", "Saints", "Colts", "Rams", "Seahawks", "Vikings",
+               "Chiefs", "Falcons", "Panthers", "Texans", "Titans", "Cardinals", "Chargers",
+               "Buccaneers", "Bengals", "Jets", "Jaguars", "Commanders", "Browns", "Ravens", "Lions", "Bills", "Redskins")
+
+nhl_teams <- c("Coyotes", "Oilers", "Predators", "Red Wings", "Bruins", "Rangers", "Sabres", "Sharks",
+               "Stars", "Blackhawks", "Jets", "Islanders", "Senators", "Avalanche", "Lightning",
+               "Panthers", "Penguins", "Blue Jackets", "Canadiens", "Canucks", "Wild", "Flames",
+               "Flyers", "Golden Knights", "Hurricanes", "Devils", "Kraken", "Blues", "Capitals", "Ducks", "Maple Leafs", "Thrashers")
+
+# Create a function to assign league
+assign_league <- function(team) {  
+  if (team %in% mlb_teams) {
+    return("MLB")
+  } else if (team %in% nba_teams) { 
+    return("NBA")
+  } else if (team %in% nfl_teams) {
+    return("NFL")
+  } else if (team %in% nhl_teams) {
+    return("NHL")
+  } else {
+    return("Unknown")
+  }
+}
+
+# Apply the function to create a new column
+four_sports_injury <- four_sports_injury %>%
+  mutate(League = sapply(Team, assign_league)) #notice we take the function then use the sapply funciton: This allows us to apply the funciton on each row of data.
+
+# View the result
+head(four_sports_injury)
+
+#Checking 
+
+four_sports_injury %>% 
+  count(League)
+
+#League     n
+#MLB        18148
+#NBA        13881
+#NFL        9861
+#NHL        14541
+#Unknown    2
+
+#Still have two uknowns will check these 
+
+four_sports_injury %>% 
+  filter(League == "Unknown") %>% 
+  select(Date, Team, Acquired, Relinquished, League)
+
+#Wally Szczerbiak Played for the Cleveland Cavaliers in 2009
+#Peter Moylan was with the Braves on rehab assignment in 2014. 
+
+
+#We can specifically change these two data points
+#Base R Way
+four_sports_injury[four_sports_injury$Relinquished == "Wally Szczerbiak" & four_sports_injury$League == "Unknown", "League"] <- "NBA"
+
+
+#Tidyverse way
+
+four_sports_injury <- four_sports_injury %>% 
+  mutate(League = ifelse(Relinquished == "Peter Moylan" & League == "Unknown", 
+                         "MLB", 
+                         League))
+
+
+#Checking 
+four_sports_injury %>% 
+  filter(League == "Unknown") %>% 
+  select(Date, Team, Acquired, Relinquished, League)
+
+four_sports_injury %>% 
+  count(League)
+#No Unknowns!
+
+
+#################################################
+#Changing Date Structure
+#################################################
+
+#Notice that dates are currently in a month, date, year format. This is not computer readible and does not allow for comparisons. 
+#We must format the date to a computer readable format. 
+
+
+str(four_sports_injury) #Date is currently a character
+
+#Will use the lubridate package to format this correctly. 
+
+
+four_sports_injury$Date <- dmy(four_sports_injury$Date)
+
+#Checking 
+four_sports_injury$Date #Now in year, month day
+
+str(four_sports_injury) #Now in date format.
+
+
+
+
+#####################################
+#Changing case of strings. 
+#####################################
+
+#Notice currently all names have upper case first and last name
+#This may not be pertinent and not workable in a computer environment
+#Need to lower case all characters within the string. 
+
+
+four_sports_injury$Acquired <- tolower(four_sports_injury$Acquired)
+
+four_sports_injury$Relinquished <- tolower(four_sports_injury$Relinquished)
+
+
+
+####################################
+#Changing variable name structure
+####################################
+
+#The variable names have upper case, which is harder to repeat and find errors within the code. 
+#We must change all variables to be in lower case script. 
+#Will use the janitor package 
+
+
+four_sports_injury <- four_sports_injury %>% 
+  clean_names()
+
+#Checking 
+names(four_sports_injury) #Looks good. 
+
+
+
+
+########################################
+#Extracting specific words from a string
+##########################################
+
+#The notes variable has a lot of words, and even paragraphs.
+#This is not tenable to perform basic analyses, on body parts or injuries, etc. 
+#We must extract specific words from these notes to create new variables for analyses. 
+#Will use the stringr package. 
+
+#We will create a new variable, looking at any knee injury. 
+
+
+# Define stems to match for different types of knee injuries: Remember, this is case specific, even for the stem!
+stems <- c("kne", "menisc", "patell", "ACL", "PCL", "MCL", "Cruciate")
+
+# Create regex pattern
+pattern <- paste0("\\b(", paste(stems, collapse = "|"), ")\\w*\\b") 
+#b starts the words, stems in the middle, w* equates parts of strings beyond the stems, b closes the search
+
+# Extract matching words from 'notes' column
+four_sports_injury <- four_sports_injury %>%
+  mutate(knee_injury_terms = str_extract_all(notes, regex(pattern, ignore_case = TRUE))) 
+#Want to extract ANY matching words
+#ignore_case = TRUE, allows for both upper and lower cases for string matches
+
+#Checking 
+
+four_sports_injury %>% 
+  count(knee_injury_terms)
+#OK, we see a lot of different combinations, with over 5,000 rows
+#A lot of knee injuries. 
+
+typeof(four_sports_injury$knee_injury_terms) #list currently, will make to character
+four_sports_injury$knee_injury_terms <- sapply(four_sports_injury$knee_injury_terms, toString) #notice the sapply again here :)
+
+
+
+##Let's do a random check of the data here to see how well we extracted knee injury 
+
+four_sports_injury %>% 
+  select(date, team, relinquished, notes, knee_injury_terms) %>% 
+  View() #Looks pretty goot 
+
+#Let's filter to just knee injuries now 
+
+four_sports_injury %>% 
+  filter(knee_injury_terms != "") %>% #Logic saying we don't want blank knnee injury character cells
+  select(date, team, relinquished, notes, knee_injury_terms) %>% 
+  View()
+#Looks good!
+
+
+
+#Let's know make a knee injury variable
+
+four_sports_injury <- four_sports_injury %>% 
+  mutate(knee_injury_binary = ifelse(knee_injury_terms == "", #This is delineating a blank character, aka no knee injury within the notes
+                                     0, 
+                                     1))
+
+#checking
+four_sports_injury %>% 
+  count(knee_injury_binary)
+#knee_injury_binary     n
+#0                      50973
+#1                      5460 #This looks correct. 
+
+
+
+#######################################################
+#Creating Seperate Datasets
+#######################################################
+
+#Suppose for the data, we want to analyze each league separately
+#We want each league to have it's own set of variables 
+
+
+#MLB
+mlb_data <- four_sports_injury %>% 
+        filter(league == "MLB")
+
+head(mlb_data) #checking
+
+#NFL 
+
+nfl_data <- four_sports_injury %>% 
+  filter(league == "NFL")
+
+
+#NBA 
+nba_data <- four_sports_injury %>% 
+  filter(league == "NBA")
+
+
+#NHL 
+nhl_data <- four_sports_injury %>% 
+  filter(league == "NHL")
+
+

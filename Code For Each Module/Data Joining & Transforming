@@ -1,0 +1,152 @@
+#####Joining Data Tutorial
+
+#Download and install packages to be used. 
+
+install.packages('dplyr')
+install.packages('ggplot2')
+install.packages('janitor')
+
+
+#Attaching Libraries 
+library(dplyr)
+library(ggplot2)
+library(janitor)
+######Getting NBA Data###########
+
+#Downloading open data for NBA 
+devtools::install_github('tylerferguson/NBAinjuries')
+
+#Attaching library
+library(NBAinjuries)
+
+#Injury Data 
+NBAinjuries::injuries
+
+#Exposure Data 
+NBAinjuries::player_totals
+
+#Saving NBA Injury Data as a Data Frame 
+
+nba_injuries <- NBAinjuries::injuries
+
+#Saving NBA Exposure and Performance Data as a Data Frame
+
+nba_exposure <- NBAinjuries::player_totals
+
+
+
+#####Exploring NBA Data#################
+
+View(nba_injuries) #View overall data set
+names(nba_injuries) #get variable names
+
+
+View(nba_exposure)
+names(nba_exposure)
+
+
+#You will notice that some of the variables are the same, but they do not have the exact same name
+#This is important when joining & analyzing data 
+#Variables names must be EXACTLY the same to joining, or they will be considered different variables.
+
+
+###################################################################
+#Cutting down variables for both datasets to get ready for joining 
+
+
+nba_injuries_cutdown <- nba_injuries %>% 
+  select(-PlayerName, -Season, -SeasonEndYear,
+    -IsActive, -TeamNameFull, -Positions, -PlayerDOB, -TeamMadePlayoffs)
+
+#Checking 
+names(nba_injuries_cutdown)
+
+nba_exposure_cutdown <- nba_exposure %>% 
+  select(-slugSeason, -slugPosition, -groupPosition,
+         -slugTeamsBREF, -isSeasonCurrent,
+         -isSeasonCurrent, -slugPlayerSeason, -idPlayerNBA,
+         -urlPlayerActionPhoto, -isHOFPlayer)
+
+names(nba_exposure_cutdown)
+
+#Moving Some Variables for Better Reference
+
+#Injuries 
+
+nba_injuries_cutdown <- nba_injuries_cutdown %>% 
+  relocate(GroupPosition, .after = PlayerId)
+
+nba_injuries_cutdown <- nba_injuries_cutdown %>% 
+  relocate(SeasonStartYear, .after = PlayerId)
+
+
+#Exposure
+nba_exposure_cutdown <- nba_exposure_cutdown %>% 
+  relocate(slugPlayerBREF, .before = namePlayer)
+
+nba_exposure_cutdown <- nba_exposure_cutdown %>% 
+  relocate(GroupPosition, .after = yearSeason)
+
+nba_exposure_cutdown <- nba_exposure_cutdown %>% 
+  relocate(slugTeamBREF, .after = namePlayer)
+
+
+#Checking 
+names(nba_exposure_cutdown)
+
+
+#Creating Lower Case Names for all variables 
+nba_injuries_cutdown <- nba_injuries_cutdown %>% 
+  clean_names()
+
+nba_exposure_cutdown <- nba_exposure_cutdown %>% 
+  clean_names()
+
+#Notice some the slightly different named variables are now the same
+#This makes our life easier
+
+
+######Changing Variables Names that Are the Same 
+
+nba_exposure_cutdown <- nba_exposure_cutdown %>% 
+  rename(player_id = slug_player_bref)
+
+nba_exposure_cutdown <- nba_exposure_cutdown %>% 
+  rename(season_start_year = year_season)
+
+
+#Making Year Variable is Numeric
+#This is critical to join correctly
+
+nba_injuries_cutdown$season_start_year <- as.numeric(nba_injuries_cutdown$season_start_year)
+
+nba_exposure_cutdown$season_start_year <- as.numeric(nba_exposure_cutdown$season_start_year)
+
+
+#####
+#For ease of this tutorial, we are going to have only one injury per year per player
+
+
+nba_injuries_cutdown_disinct <- nba_injuries_cutdown %>% 
+  distinct(player_id, season_start_year, .keep_all = T)
+
+
+######################
+#We are Ready to Join!
+
+nrow(nba_exposure_cutdown) #6,715 rows
+
+nba_joined_injury_exposure <- left_join(nba_exposure_cutdown, nba_injuries_cutdown_disinct, 
+                                        by = c("player_id", "season_start_year"))
+
+nrow(nba_joined_injury_exposure) #6,715 rows -- Yay!
+
+View(nba_joined_injury_exposure)
+
+#Notice that injury data is NA for many people. 
+#This is showing that these players did not have an injury in that season. 
+
+
+write.csv(nba_joined_injury_exposure, 
+          "FilePath\\NBA_Joined_Data.csv", 
+          row.names = F)

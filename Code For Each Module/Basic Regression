@@ -1,0 +1,176 @@
+#Attaching Libraries 
+library(dplyr)
+library(ggplot2)
+library(Epi)
+library(car)
+
+
+######Getting the Running Through Data###########
+
+#Save the data set to your computer R Console, directly from Github.
+running_reliability <- read.csv("https://raw.githubusercontent.com/gsb15/Running-Through-Reliability-Data/main/RunningThrough_Reliability_Data.csv")
+
+View(running_reliability)
+names(running_reliability)
+head(running_reliability)
+str(running_reliability)
+
+
+#Counting How Many People are in the dataset 
+running_reliability %>%
+  count(redcap_record_id) %>%
+  nrow()
+
+
+#Data is in 'long' format, at the week level, let us take a look
+running_reliability %>%
+  count(redcap_record_id, week, sort = TRUE) %>% 
+  head()
+
+
+#There are 144 repeated weeks. We will take the first observation as they are seen in the data
+#Of note:This is so we do not violate the independence assumption between observations
+#To include all observations per person, we would use different modelling strategies
+
+#Getting first observation 
+
+running_one_obs <- running_reliability %>%
+                    group_by(redcap_record_id) %>% #groups by person
+                    slice(1)  #keeps first observation only, keeps all information in the observation row
+
+View(running_one_obs)
+
+
+
+#We care most about the relationship between average weekly heart rate and average running distance. We can drop the subjects who are missing all of their HR data.
+
+missing_ids <- running_one_obs %>%
+  select(redcap_record_id, averageHeartRateInBeatsPerMinute) %>% #selecting the variables to asses
+  group_by(redcap_record_id) %>% #grouping by person
+  summarize(N = n(),
+            missing_hr = sum(is.na(averageHeartRateInBeatsPerMinute)), #summing missing data
+            pct_missing = missing_hr / N) %>%
+  ungroup() %>% #ungrouping
+  filter(pct_missing == 1) %>% #getting the people with missing heart rate
+  pull(redcap_record_id)
+
+running_one_obs <- running_one_obs %>%
+  filter(!redcap_record_id %in% missing_ids) #filters to people without missing heart rate data
+#notice the ! sign, this is showing NOT these records here
+
+
+#Our outcome variable is Average Heart Rate in Beats per Minute
+#We want to estimate this from average weekly running speed (a proxy for weekly training intensity) and gender
+
+
+#For reference
+#`Gender`: 1 = Male, 2 = Female
+#`Age Strata`: 1 = 22-40, 2 = 41-60, 3 = 61-83
+
+
+#First Let Us Visualize 
+running_one_obs %>%
+  ggplot(aes(x = averageSpeedInMetersPerSecond, y = averageHeartRateInBeatsPerMinute, 
+             color = as.factor(gender))) + #notice the as.factor here: creates a binary variable
+  geom_point() +
+  facet_wrap(~age_strata) + #This creates the scatter plots side by side
+  scale_color_manual(
+    values = c("1" = "blue", "2" = "red"),
+    labels = c("1" = "Male", "2" = "Female")) + #making sure these are written right in the legend
+  labs(x = "Average Speed (m/s)",
+       y = "Average Heart Rate (bpm)",
+       color = "Gender",
+       title = "Average Weekly Speed by Average Heart Rate, Stratified by Age") +
+  theme(legend.position = "bottom")
+
+
+#Finish by making `age_strata` and `gender` factor variables for the analysis
+
+running_one_obs <- running_one_obs %>%
+  mutate(age_strata_fact = as.factor(age_strata),
+         gender_fact = as.factor(gender))
+
+
+
+
+#Regression!
+#With LM function
+fit_lm <- lm(averageHeartRateInBeatsPerMinute ~ averageSpeedInMetersPerSecond + age_strata_fact + gender_fact, 
+             data = running_one_obs)
+#Summary 
+summary(fit_lm)
+
+#With 95% CI's
+ci.lin(fit_lm)
+
+
+#Using GLM function 
+fit_glm <- glm(averageHeartRateInBeatsPerMinute ~ averageSpeedInMetersPerSecond + age_strata_fact + gender_fact, 
+             data = running_one_obs, family = 'gaussian')
+#Summary 
+summary(fit_glm)
+
+#With 95% CI's
+ci.lin(fit_glm)
+
+
+#Assessing Diagnostics 
+
+plot(fit_glm)
+
+#What we see is there may some clusering, and a few points are close to being high leverage points. 
+
+
+#Let us perform a log transformation
+#Using GLM function 
+fit_glm_log <- glm(log(averageHeartRateInBeatsPerMinute) ~ log(averageSpeedInMetersPerSecond) + age_strata_fact + gender_fact, 
+               data = running_one_obs, family = 'gaussian')
+
+#Summary with 95% CI's
+ci.lin(fit_glm_log) #Remember: log transformation equates % change, not actual units change,
+
+#Assessing Diagnostics 
+plot(fit_glm_log)
+
+#You will see that the diagnostics are worse!
+#This means to stick with the raw data.
+
+
+#Finally: Checking VIF, Using Raw Data Regression 
+fit_glm <- glm(averageHeartRateInBeatsPerMinute ~ averageSpeedInMetersPerSecond + age_strata_fact + gender_fact, 
+               data = running_one_obs, family = 'gaussian')
+
+#Summary With 95% CI's
+ci.lin(fit_glm)
+
+
+#Assessing VIF
+vif(fit_glm) #This looks good! Very low VIF. 
+
+
+#Final Thing: Creating Plot with Regression
+running_one_obs %>%
+  ggplot(aes(
+      x = averageSpeedInMetersPerSecond,
+      y = averageHeartRateInBeatsPerMinute,
+      color = as.factor(gender)
+    )) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(
+    method = "glm",
+    se = TRUE #This adds 95% CI bands to the regression lines
+  ) +
+  scale_color_manual(
+    values = c("1" = "blue", "2" = "red"),
+    labels = c("1" = "Male", "2" = "Female")
+  ) +
+  labs(
+    x = "Average Speed (m/s)",
+    y = "Average Heart Rate (bpm)",
+    color = "Gender",
+    title = "Average Weekly Speed by Average Heart Rate, Stratified by Gender"
+  ) +
+  theme(legend.position = "bottom")
+
+
+

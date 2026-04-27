@@ -1,0 +1,214 @@
+#Epidemiological Calculations
+
+
+#Download and install packages to be used. 
+
+install.packages('dplyr')
+install.packages('ggplot2')
+install.packages('GenBinomApps')
+
+
+#Attaching Libraries 
+library(dplyr)
+library(ggplot2)
+library(GenBinomApps)
+
+######Getting NBA Data That You Joined and Cleaned Already###########
+
+#Save the data set to your computer R Console, directly from Github.
+nba_joined <- read.csv("https://raw.githubusercontent.com/gsb15/NBA-Injury-Exposure-Data-/main/NBA_Joined_Data.csv")
+
+
+  
+###################################################
+#Checking Data 
+  
+#View dataset 
+View(nba_joined)
+names(nba_joined)  
+
+#Getting a basic idea of the spread of injury severity
+min(nba_joined$days_injured, na.rm = T)
+round(mean(nba_joined$days_injured, na.rm = T), 1)
+max(nba_joined$days_injured, na.rm = T)
+  
+
+
+#Classifying Injuries based on severity 
+nba_joined <- nba_joined %>% 
+  mutate(injury_severity = ifelse(days_injured > 6 & days_injured < 28, 
+                                  "Moderate", 
+                                  ifelse(days_injured > 28, 
+                                         "Severe", 
+                                         "Minor")))
+
+#Basic Counts
+nba_joined %>% 
+  count(injury_severity)
+#Minor 1405
+#Moderate  765
+#Severe  696
+
+
+nba_joined %>% 
+  group_by(group_position.y) %>% 
+  count(injury_severity)
+
+
+#Classifying Any Injury Verus No Injury Within the Season 
+
+nba_joined <- nba_joined %>% 
+  mutate(injury = ifelse(!is.na(injury_severity), 
+                         1, 
+                         0))
+
+
+nba_joined %>% 
+  count(injury) #2866 total injuries
+
+#Getting Total Number of Athletes 
+
+nba_joined %>% 
+  distinct(player_id)
+
+#1553 players
+
+
+nba_joined %>% 
+  filter(injury == 1) %>% 
+  distinct(player_id, injury)
+
+#814 players sustained ANY injury within these data
+
+#Prevalence of Injury 
+
+814/1553 #52%
+
+#Getting 95% Confidence Interval 
+
+clopper.pearson.ci(814, 1553, alpha = 0.05, CI = 'two.sided')
+
+#Overall Injury Prevalence: 52% (95% CI: 50, 55)
+
+
+####################################
+#Assessing Injury Incidence Per Year
+####################################
+
+#Injuries Per Year
+year_injury_count <- nba_joined %>% 
+                        group_by(season_start_year) %>% 
+                        filter(injury == 1) %>% 
+                        count(injury)
+
+#Players Per Year
+players_per_year <- nba_joined %>% 
+                      group_by(season_start_year) %>% 
+                      summarise(row_count = n())
+
+
+
+#Combing Injuries & Players Per Year 
+
+injury_players_joined <- left_join(year_injury_count, players_per_year, by = c("season_start_year"))
+
+View(injury_players_joined)
+
+
+#Renaming Variables 
+
+injury_players_joined <- injury_players_joined %>% 
+  rename(injury_count = n)
+
+injury_players_joined <- injury_players_joined %>% 
+  rename(player_count = row_count)
+
+#Calculating Injury Incidence per Year 
+
+injury_players_joined$injury_incidence <- round((injury_players_joined$injury_count / injury_players_joined$player_count)*100, 1)
+
+
+#To See the Incidence
+
+injury_players_joined$injury_incidence
+
+#############################
+#Calculating Rates 
+
+sum(nba_joined$minutes_totals) #8,085,009 total minutes!
+
+
+sum(nba_joined$injury, na.rm = T) #2,866 Injuries 
+
+#Overall Rate 
+
+round((2866/8085009)*1000, 2) #0.35 injuries per 1,000 minutes played
+
+#Per Season 
+minutes_season <- nba_joined %>% 
+                    group_by(season_start_year) %>% 
+                    summarise(minutes_season = sum(minutes_totals, na.rm = T))
+
+#Adding to our Data Frame by Year 
+
+
+injury_players_joined <- left_join(injury_players_joined, minutes_season, by = c("season_start_year"))
+
+
+injury_players_joined$injury_rate_per_1000_min <- round((injury_players_joined$injury_count / injury_players_joined$minutes_season) * 1000, 2)
+
+
+###############################
+#Calculating by Injury Severity 
+
+
+
+injury_severity_season <- nba_joined %>% 
+                          group_by(season_start_year) %>%
+                          count(injury_severity)
+
+#Taking Out Missing Values for Severity
+injury_severity_season <- injury_severity_season %>% 
+                              filter(!is.na(injury_severity))
+
+#Adding Games Played for a Different Exposure 
+
+games_played_season <- nba_joined %>% 
+                        group_by(season_start_year) %>%
+                        summarise(games_played = sum(count_games, na.rm = T))
+
+
+injury_severity_season_joined <- left_join(injury_severity_season, games_played_season, by = c("season_start_year"))
+
+
+#Renaming Column 
+injury_severity_season_joined <- injury_severity_season_joined %>% 
+                                    rename(injury_severity_count = n)
+
+
+#Calculating Injury Rate by Severity and Season 
+
+injury_severity_season_joined$injury_rate_per_1000_min <- round((injury_severity_season_joined$injury_severity_count / injury_severity_season_joined$games_played) * 1000, 2)
+
+
+#############################################
+#Creating a Visual of Injury Rate by Severity by Season 
+
+ggplot(injury_severity_season_joined, aes(season_start_year, injury_rate_per_1000_min, color = injury_severity)) +
+  geom_line(size = 1) +
+  labs(title = "Injury Rate by Severity Over Time",
+       x = "Season", y = "Injury Rate per 1000 Games", 
+       color = "Injury Severity") +
+  theme_minimal()
+
+
+
+
+
+
+
+
+
+
+
+

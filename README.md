@@ -24,7 +24,8 @@
 
 
 
-**Further Resources:** Additional resources are at your fingertips for further reference. These are signposted for each learning module. All books are open source and free. 
+**Further Resources:** Additional resources are at your fingertips for further reference. These are signposted for each learning module. All books are open source and free.
+
 •	Whickam H, Cetinkaya-Rundel M, Grolemund G (2023). R for Data Science: Import, Tidy, Transform, Visualize, and Model Data (2nd Edition). O’Reiley. https://r4ds.hadley.nz/ 
 
 •	Hernán MA, Robins JM (2020). Causal Inference: What If. Boca Raton: Chapman & Hall/CRC. https://miguelhernan.org/whatifbook

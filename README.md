@@ -7,6 +7,7 @@
 
 **Data Sets:** All datasets used for this course are open source and freely accessible. They can be downloaded and shared, to explore these data. From experience, the more exploration and collaboration that occurs while learning will improve burgeoning data science skills. 
 
+
 •	Four Professional Leagues Data: This is web scraped data from the four major professional sport leagues in North America. These data are injury surveillance and transactions data from 2007-2019. The data can be found here (under Supplement 1): https://www.nature.com/articles/s41598-021-87920-6#Sec28   
 
 •	National Basketball League (NBA) Data: This is web scraped data of injury surveillance and performance data from the NBA from 2007-2020. The overall NBA data can be found here: https://osf.io/xywq4/. The NBA rookies data can be found here: https://github.com/gsb15/NBA_Rookies_Data. 
@@ -15,6 +16,8 @@
 
 
 **Tools:** There are specific computing and online tools required for this course. All are open access and freely accessible. 
+
+
 •	R Computer Software: This course will be taught using R computer software. You can download the software here for MAC of PC: https://www.r-project.org/.
 
 •	R Studio: It is recommended to use R Studio as your GUI interface, instead of the basic R software. In my experience, it is easier, quicker, and more intuitive. You can download R studio for MAC or PC here: https://posit.co/download/rstudio-desktop/.

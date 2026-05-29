@@ -1,0 +1,212 @@
+#####Evaluating Missing Data 
+
+#Download and install packages to be used. 
+
+install.packages('dplyr')
+install.packages('naniar')
+install.packages('ggplot2')
+install.packages('visdat')
+
+
+#Attaching Libraries 
+library(dplyr)
+library(ggplot2)
+library(naniar)
+library(visdat)
+
+######Getting NBA Data###########
+
+#Downloading open data for NBA 
+devtools::install_github('tylerferguson/NBAinjuries')
+
+#Attaching library
+library(NBAinjuries)
+
+#Injury Data 
+NBAinjuries::injuries
+
+#Exposure Data 
+NBAinjuries::player_totals
+
+#Saving NBA Injury Data as a Data Frame 
+
+nba_injuries <- NBAinjuries::injuries
+
+#Saving NBA Exposure and Performance Data as a Data Frame
+
+nba_exposure <- NBAinjuries::player_totals
+
+
+
+##################################################
+#Exploring Injury Data 
+
+names(nba_injuries)
+View(nba_injuries)
+
+
+
+########################################
+#Evaluating Missing Data for Injury Data 
+########################################
+
+
+#Overall Missing Prevalence
+sum(is.na(nba_injuries)) #2986 Missing Data Points 
+
+dim(nba_injuries) #Rows: 6,541 ; Columns: 29 
+
+6541*29 #Total Data Points: 189,689
+
+(2986/(6541*29))*100 #1.6% Missing Prevalence
+
+
+#Assessing Each Column
+
+vis_dat(nba_injuries) #Majority of missingness is in the body part variable, followed by draft pick
+
+vis_miss(nba_injuries) #Hear we see % per variable; body part is 20%, draft pick 10%
+
+
+#Getting Tabular Output of Missingness per Column
+nba_injuries %>% 
+  miss_var_summary() %>% 
+  View()
+
+
+#Assessing Missing Patterns 
+#Hypothesize potential patterns within the data explaining the missingness
+
+ggplot(nba_injuries, 
+       aes(x = GroupPosition, 
+           y = BodyPartInjured)) + 
+  geom_miss_point() #Centers are missing a lot
+
+ggplot(nba_injuries, 
+       aes(x = GroupPosition, 
+           y = DraftPick)) + 
+  geom_miss_point() #Centers the same for draft pick 
+
+#HOWEVER, we also see here, that draft picks are 1-60
+#All missing draft picks for all positions are out of 1-60.
+#This is due to that they are free agent signings and were not drafted.
+#This is a cleaning issue
+
+ggplot(nba_injuries, 
+       aes(x = Season, 
+           y = DraftPick)) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) + #This line of code helps you see the x ticks bette (45 degree angles)
+  geom_miss_point() #Season is Same & Season is Missing for a few
+
+ggplot(nba_injuries, 
+       aes(x = GroupPosition, 
+           y = DraftPick)) + 
+  geom_miss_point() + 
+  facet_wrap(~Season) +
+  theme_dark() #We see same patterns when looking at position by season
+
+
+ggplot(nba_injuries, 
+       aes(x = Positions, 
+           y = GroupPosition)) + 
+  geom_miss_point() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) #To make X ticks 45 degrees
+#We see here that some centers are grouped as forwards
+#But we also see Centers were not transposed to GroupPosition variable for Centers Correctly
+#This is a lot of the missing explanation, a cleaning issue!
+
+
+#Getting Deeper into Body Part and Draft Pick 
+
+
+nba_injuries %>%
+  bind_shadow() %>%
+  dplyr::group_by(Season_NA) %>%
+  dplyr::summarise(
+    mean = mean(GamesMissed, na.rm = TRUE),
+    sd   = sd(GamesMissed, na.rm = TRUE),
+    var  = var(GamesMissed, na.rm = TRUE),
+    min  = min(GamesMissed, na.rm = TRUE),
+    max  = max(GamesMissed, na.rm = TRUE)
+  )
+
+
+
+#Assessing Shadow Matrix
+nba_injuries %>% 
+  bind_shadow() %>% 
+ggplot(
+       aes(x = DaysBetweenGames,
+           colour = DraftPick_NA, 
+           fill = DraftPick_NA)) + #Fill allows the color to filled, not just the outline.
+  geom_density() + 
+  xlim(0, 50)
+#We see a similar density of missing draft pick (i.e., free agent) and drafted for days between games
+
+
+
+####################################################################################
+#Cleaning NBA Injuries Data 
+
+
+#Transforming GroupPosition Variable for Centers 
+
+
+nba_injuries <- nba_injuries %>% 
+  mutate(GroupPosition = ifelse(Positions == "Center", 
+                                "C", 
+                                GroupPosition))
+
+
+#Checking Transformation 
+
+nba_injuries %>% 
+  count(GroupPosition)
+
+#Only one missing data point now, much better
+
+
+
+####Transforming Draft Pick 
+
+nba_injuries <- nba_injuries %>% 
+  mutate(DraftPick = ifelse(is.na(DraftPick), 
+                            61, 
+                            DraftPick))
+
+
+hist(nba_injuries$DraftPick, breaks = 20)
+
+sum(is.na(nba_injuries$DraftPick)) #Now 0, since all free agents now have a data point
+
+
+
+#########
+#Assessing biological plausibility of demographics data 
+
+hist(nba_injuries$Height, breaks = 20) #A few at 90, by itself will check 
+
+
+nba_injuries %>% 
+  filter(Height > 87) %>% 
+  select(PlayerId, PlayerName, Height, Weight)
+#All of these players are legitimately this tall
+
+
+hist(nba_injuries$Weight, breaks = 20)
+#Let's Check the players that weigh 150 and also >350
+
+nba_injuries %>% 
+  filter(Weight < 155 | Weight > 315) %>% 
+  select(PlayerId, PlayerName, Height, Weight)
+#Earl Boykins was this light 
+#Shaq was that heavy
+#All of these are good and sound continuous data 
+
+
+
+
+
+
+
+
